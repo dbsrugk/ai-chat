@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
 """
-app.py — Claude · GPT · Gemini 3자 대화 (호스팅 배포용, 실제 API)
-=================================================================
+app.py — Claude · GPT 2자 대화 (호스팅 배포용, 실제 API)
+=========================================================
 이 파일을 Render 등 무료 호스팅에 올리면, 인터넷 주소만으로
-어디서든 진짜 세 AI가 번갈아 대화하는 사이트가 됩니다.
+어디서든 진짜 Claude와 GPT가 번갈아 대화하는 사이트가 됩니다.
 
-호스팅에서 설정할 환경변수(Environment Variables) 3개:
+호스팅에서 설정할 환경변수(Environment Variables) 2개:
     ANTHROPIC_API_KEY = sk-ant-...
     OPENAI_API_KEY    = sk-...
-    GOOGLE_API_KEY    = AIza...
 
-자세한 배포 방법은 함께 제공한 "배포가이드.md" 참고.
-(로컬에서 테스트하려면: pip install -r requirements.txt 후 python app.py)
+(Gemini를 다시 넣고 싶으면 아래 ORDER와 HANDLERS, 화면 부분에
+ Gemini를 추가하고 GOOGLE_API_KEY 환경변수를 설정하면 됩니다.)
 """
 
 import os
@@ -20,16 +19,14 @@ from flask import Flask, request, jsonify, Response
 # ── 모델 설정 (2026-06 최신. 자유롭게 변경 가능) ──
 CLAUDE_MODEL = "claude-opus-4-6"
 GPT_MODEL    = "gpt-5.5"
-GEMINI_MODEL = "gemini-3.5-flash"
 
 PERSONAS = {
     "Claude": "너는 Claude야. 사려 깊고 호기심이 많으며, 가끔 질문을 던져 대화를 넓힌다.",
     "GPT":    "너는 GPT야. 위트 있고 활기차며, 농담과 가벼운 비유를 즐긴다.",
-    "Gemini": "너는 Gemini야. 차분하고 박식하며, 흥미로운 사실이나 다른 관점을 곁들인다.",
 }
 
 BASE_RULES = (
-    "지금 Claude, GPT, Gemini 세 AI가 한 채팅방에서 자유롭게 잡담하고 있다. "
+    "지금 Claude와 GPT 두 AI가 한 채팅방에서 자유롭게 잡담하고 있다. "
     "한국어로, 사람처럼 자연스럽고 짧게(2~4문장) 말해라. "
     "딱딱한 설명체 대신 친구끼리 수다 떠는 말투로. "
     "앞사람 말을 듣고 자연스럽게 이어가되, 가끔 새로운 얘깃거리도 던져라. "
@@ -86,22 +83,7 @@ def ask_gpt(history, topic):
     return resp.choices[0].message.content.strip()
 
 
-def ask_gemini(history, topic):
-    from google import genai
-    from google.genai import types
-    client = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
-    resp = client.models.generate_content(
-        model=GEMINI_MODEL,
-        contents=make_user_msg("Gemini", history),
-        config=types.GenerateContentConfig(
-            system_instruction=make_system("Gemini", topic),
-            max_output_tokens=300,
-        ),
-    )
-    return resp.text.strip()
-
-
-HANDLERS = {"Claude": ask_claude, "GPT": ask_gpt, "Gemini": ask_gemini}
+HANDLERS = {"Claude": ask_claude, "GPT": ask_gpt}
 
 
 @app.route("/")
@@ -114,7 +96,6 @@ def keys_status():
     return jsonify({
         "Claude": bool(os.environ.get("ANTHROPIC_API_KEY")),
         "GPT": bool(os.environ.get("OPENAI_API_KEY")),
-        "Gemini": bool(os.environ.get("GOOGLE_API_KEY")),
     })
 
 
@@ -139,13 +120,12 @@ PAGE = r"""<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Claude · GPT · Gemini 3자 대화</title>
+<title>Claude · GPT 대화</title>
 <style>
   :root{
     --panel:#171a23; --panel2:#1d212c;
     --claude:#7c9cff; --claude-bg:#1b2440;
     --gpt:#5fd28a;    --gpt-bg:#163127;
-    --gemini:#ff8fab; --gemini-bg:#3a1f2b;
     --text:#e7e9ee; --muted:#8b90a0; --line:#262a36;
   }
   *{box-sizing:border-box;margin:0;padding:0}
@@ -159,7 +139,7 @@ PAGE = r"""<!DOCTYPE html>
   .avas .ava{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;
     font-weight:700;font-size:13px;color:#0f1117;border:2px solid var(--panel2);margin-left:-8px}
   .avas .ava:first-child{margin-left:0}
-  .ava.c{background:var(--claude)} .ava.g{background:var(--gpt)} .ava.m{background:var(--gemini)}
+  .ava.c{background:var(--claude)} .ava.g{background:var(--gpt)}
   .head-meta{flex:1}
   header h1{font-size:16px;font-weight:700}
   header p{font-size:12px;color:var(--muted);margin-top:2px}
@@ -172,10 +152,10 @@ PAGE = r"""<!DOCTYPE html>
   .row{display:flex;gap:10px;max-width:88%;align-self:flex-start;animation:rise .35s ease}
   @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
   .sm{width:30px;height:30px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:#0f1117}
-  .sm.Claude{background:var(--claude)} .sm.GPT{background:var(--gpt)} .sm.Gemini{background:var(--gemini)}
+  .sm.Claude{background:var(--claude)} .sm.GPT{background:var(--gpt)}
   .name{font-size:11px;color:var(--muted);margin-bottom:4px}
   .bub{padding:11px 14px;border-radius:16px;border-top-left-radius:5px;font-size:14.5px;line-height:1.55;white-space:pre-wrap}
-  .bub.Claude{background:var(--claude-bg)} .bub.GPT{background:var(--gpt-bg)} .bub.Gemini{background:var(--gemini-bg)}
+  .bub.Claude{background:var(--claude-bg)} .bub.GPT{background:var(--gpt-bg)}
   .bub.err{background:#3a1f1f;color:#ff9b9b}
   .typing{display:flex;gap:4px;padding:14px}
   .typing span{width:7px;height:7px;border-radius:50%;background:var(--muted);animation:bounce 1.2s infinite}
@@ -195,11 +175,11 @@ PAGE = r"""<!DOCTYPE html>
 <div class="app">
   <header>
     <div class="avas">
-      <div class="ava c">C</div><div class="ava g">G</div><div class="ava m">G</div>
+      <div class="ava c">C</div><div class="ava g">G</div>
     </div>
     <div class="head-meta">
-      <h1>Claude · GPT · Gemini</h1>
-      <p>세 AI의 실시간 3자 대화</p>
+      <h1>Claude · GPT</h1>
+      <p>두 AI의 실시간 대화</p>
     </div>
     <div class="live"><span class="blink"></span><span id="status">대기 중</span></div>
   </header>
@@ -217,7 +197,7 @@ PAGE = r"""<!DOCTYPE html>
 </div>
 
 <script>
-const ORDER = ["Claude","GPT","Gemini"];
+const ORDER = ["Claude","GPT"];
 const feed = document.getElementById('feed');
 const statusEl = document.getElementById('status');
 const toggleBtn = document.getElementById('toggle');
@@ -295,7 +275,7 @@ document.getElementById('reset').onclick=()=>{
 };
 document.getElementById('save').onclick=()=>{
   if(!history.length){alert('저장할 대화가 없습니다.');return;}
-  let txt='# Claude · GPT · Gemini 대화\n\n';
+  let txt='# Claude · GPT 대화\n\n';
   const topic=document.getElementById('topicInput').value.trim();
   if(topic)txt+='# 주제: '+topic+'\n\n';
   history.forEach(h=>txt+=h.speaker+': '+h.text+'\n\n');
@@ -304,7 +284,7 @@ document.getElementById('save').onclick=()=>{
   a.download='ai_chat_log.txt';a.click();
 };
 
-addMessage('Claude','시작 버튼을 누르면 Claude·GPT·Gemini 세 AI가 실제로 번갈아 대화합니다. 위에 주제를 적으면 그 주제로 시작해요.',false);
+addMessage('Claude','시작 버튼을 누르면 Claude와 GPT가 실제로 번갈아 대화합니다. 위에 주제를 적으면 그 주제로 시작해요.',false);
 history.length=0;
 </script>
 </body>
